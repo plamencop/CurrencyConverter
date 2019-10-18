@@ -1,0 +1,58 @@
+# Java project Web App to Linux on Azure
+
+trigger:
+- master
+
+variables:
+
+  # Azure Resource Manager connection created during pipeline creation
+  azureSubscription: '3a5f4c8d-55df-4342-bdd5-fc25d6df1261'
+
+  # Web app name
+  webAppName: 'myazure-devops-java-app'
+
+  # Agent VM image name
+  vmImageName: 'ubuntu-latest'
+
+stages:
+- stage: Build
+  displayName: Build stage
+  jobs:
+  - job: MavenPackageAndPublishArtifacts
+    displayName: Maven Package and Publish Artifacts
+    pool:
+      vmImage: $(vmImageName)
+    
+    steps:
+    - task: Maven@3
+      displayName: 'Maven Package'
+      inputs:
+        mavenPomFile: 'pom.xml'
+        mavenOptions: '-Xmx3072m'
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.8'
+        jdkArchitectureOption: 'x64'
+        publishJUnitResults: true
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        goals: 'package'
+
+    # Publish Cobertura or JaCoCo code coverage results from a build
+    - task: PublishCodeCoverageResults@1
+      inputs:
+        codeCoverageTool: 'JaCoCo' 
+        summaryFileLocation: '$(System.DefaultWorkingDirectory)/**/site/jacoco/jacoco.xml'
+        reportDirectory: '$(System.DefaultWorkingDirectory)/**/site/jacoco'
+        failIfCoverageEmpty: true
+
+    - task: CopyFiles@2
+      displayName: 'Copy Files to artifact staging directory'
+      inputs:
+        SourceFolder: '$(System.DefaultWorkingDirectory)'
+        Contents: '**/target/*.?(war|jar)'
+        TargetFolder: $(Build.ArtifactStagingDirectory)
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish build artifacts'
+      inputs:
+        artifactName: 'war
+        targetPath: $(Build.ArtifactStagingDirectory)
